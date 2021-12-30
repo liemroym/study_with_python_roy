@@ -19,7 +19,9 @@ class Game:
         self.screen = pygame.display.set_mode((500, 500))
         # head = snake[0], tail = snake[-1]
         self.snake = [(80, 20), (60, 20), (40, 20), (20, 20)]
+        self.reset()
 
+    def reset(self):
         # starting condition
         self.x = 4
         self.y = 1
