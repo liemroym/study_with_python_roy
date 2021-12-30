@@ -1,4 +1,4 @@
-from game_ori import Game
+from game import Game
 
 MAX_MEMORY = 100000 # max memory (using deque, remove oldest memory)
 BATCH_SIZE = 1000
@@ -50,7 +50,7 @@ def train():
             # train long + plot
             game.reset()
             agent.trainLong(currState, move, reward, newState, gameOver)
-            
+
 
 if __name__ == '__main__':
     train()
