@@ -12,7 +12,7 @@ SNAKE_COLOR = (0, 255, 0)
 FOOD_COLOR = (255, 0, 0)
 
 pygame.init()
-font = pygame.font.Font('Roboto-Thin.ttf', 25)
+font = pygame.font.Font('Roboto-Medium.ttf', 25)
 
 class Game:
     def __init__(self):
@@ -31,7 +31,6 @@ class Game:
         self.frameIteration = 0
 
         self.placeFood()
-        self.startGame()
 
     # draw all of the snake body
     def drawSnake(self):
@@ -72,14 +71,14 @@ class Game:
             self.food = (np.random.randint(0, 24) * GRID_SIZE, np.random.randint(0, 24) * GRID_SIZE)
         pygame.draw.rect(self.screen, FOOD_COLOR, pygame.Rect(self.food[0], self.food[1], BODY_SIZE, BODY_SIZE))    
 
-    def checkColision(self, point=None):
+    def checkCollision(self, point=None):
         # receives point, checks if the snake will collide if it went to that point
         if (point == None): point = self.snake[0]
         x = point[0] / 20
         y = point[1] / 20
         return (x < 0 or y < 0 or x > 24 or y > 24 or (x * GRID_SIZE, y * GRID_SIZE) in self.snake[1:])
         
-    def startGame(self):
+    def startGame(self, action):
         reward = 0
         gameOver = False
         self.frameIteration += 1
@@ -89,11 +88,11 @@ class Game:
                 pygame.quit()
                 sys.exit()
 
-        self.moveSnake()
+        self.moveSnake(action)
         self.drawSnake()
         
         # finish if colliding / game went too long on that snake length
-        if (self.checkColision or self.frameIteration > 100 * len(self.snake)):
+        if (self.checkCollision or self.frameIteration > 100 * len(self.snake)):
             gameOver = True
             reward = -10
             return reward, gameOver, self.score
