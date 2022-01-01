@@ -1,24 +1,28 @@
 # followed series: https://www.youtube.com/watch?v=VGkcmBaeAGM
 
+# Tensors can run on GPUs
 from numpy.random.mtrand import rand
 import torch
 import random
 import numpy as np
 from game import Game
+from model import LinearQNet, QTrainer
+from plotter import plot
 from collections import deque
+
 
 MAX_MEMORY = 100000 # max memory (using deque, remove oldest memory)
 BATCH_SIZE = 1000
-LR = 0.001 # learning rate, used in Bell equation
+LR = 0.01 # learning rate, used in Bell equation
 
 class Agent:
     def __init__(self):
         self.ngames = 0 # for tracking how many games iterated, deciding when randomness disappear
         self.epsilon = 0 # randomness, used for early random moves
-        self.gamma = 0 # discount rate, used in Bell equation
+        self.gamma = 0.9 # discount rate, used in Bell equation
         self.memory = deque(maxlen=MAX_MEMORY) # data structure, for saving memories (currstate, action, etc)
-        self.model = None
-        self.trainer = None
+        self.model = LinearQNet(11, 512, 3)
+        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def getState(self, game):
         # state:
@@ -66,8 +70,8 @@ class Agent:
             # left, right, up, down
             (game.x > game.food[0]), # food on right
             (game.x < game.food[0]), # food on left
-            (game.y > game.food[0]), # food on up
-            (game.y > game.food[0])  # food on down
+            (game.y < game.food[1]), # food on up
+            (game.y > game.food[1])  # food on down
         ]
 
         return np.array(state, dtype=int)
@@ -93,12 +97,14 @@ class Agent:
         self.epsilon = 80 - self.ngames
         move = [0, 0, 0]
         if (random.randint(0, 200) < self.epsilon):
-            move[random.randint(0, 2)] = 1
+            predMove = random.randint(0, 2)
+            move[predMove] = 1
         else:
-            stateTensor = torch.tensor(state, float)
+            stateTensor = torch.tensor(state, dtype=torch.float)
             prediction = self.model(stateTensor)
-            # torch.argmax(tensor).item() --> returns index of maximum argument ([5.03, 4.1, 0.23] --> 0)
-            move[torch.argmax(prediction).item()] = 1
+            # torch.argmax(tensor).item() --> returns index of maximum argument ([5.03, 4.1, 0.23] --> 0) (.item() != index)
+            predMove = torch.argmax(prediction).item()
+            move[predMove] = 1
 
         return move
 
@@ -106,30 +112,46 @@ class Agent:
 def train():
     plotScores = []
     plotMeanScores = []
+    totalScore = 0 # to count mean
     record = 0
 
     game = Game()
     agent = Agent()
-
+    
     while True:
         # do move for current state
         currState = agent.getState(game)
         move = agent.getAction(currState)
+
+        # if (move == [1, 0, 0]):
+        #     print("STRAIGHT") 
+        # elif (move == [0, 1, 0]):
+        #     print("RIGHT")
+        # else:
+        #     print("LEFT")
+
         reward, gameOver, score = game.startGame(move)
         newState = agent.getState(game)
         agent.trainShort(currState, move, reward, newState, gameOver)
 
-        agent.save(currState, reward, score, newState, gameOver)
+        agent.save(currState, move, reward, newState, gameOver)
 
         if gameOver:
             # train long + plot
             game.reset()
             agent.ngames += 1
-            agent.trainLong(currState, move, reward, newState, gameOver)
+            agent.trainLong()
 
             if (score > record):
                 record = score
+                agent.model.save()
 
+            print('Game:', agent.ngames, 'Score:', score, 'Record:', record)
+            plotScores.append(score)
+            totalScore += score
+            plotMeanScores.append(totalScore / agent.ngames)
+
+            plot(plotScores, plotMeanScores)
 
 
 if __name__ == '__main__':

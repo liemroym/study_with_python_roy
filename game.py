@@ -3,6 +3,8 @@ from numpy.lib.function_base import place
 import pygame
 import sys
 import numpy as np
+import time
+from torch.autograd.grad_mode import F
 
 # Constants
 GRID_SIZE = 20
@@ -17,25 +19,21 @@ font = pygame.font.Font('Roboto-Medium.ttf', 25)
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode((500, 500))
-        # head = snake[0], tail = snake[-1]
-        self.snake = [(80, 20), (60, 20), (40, 20), (20, 20)]
         self.reset()
 
     def reset(self):
         # starting condition
-        self.x = 4
-        self.y = 1
-        self.score = 0
-        self.direction = 'RIGHT'
+        # head = snake[0], tail = snake[-1]
+        self.snake = [(200, 200), (200, 180), (200, 160)]        
         
+        self.x = 200
+        self.y = 200
+        self.score = 0
+        self.direction = 'UP'
+
         self.frameIteration = 0
 
-        self.placeFood()
-
-    # draw all of the snake body
-    def drawSnake(self):
-        for body in self.snake:
-            pygame.draw.rect(self.screen, SNAKE_COLOR, pygame.Rect(body[0], body[1], BODY_SIZE, BODY_SIZE))
+        self.placeFood()    
     
     # move snake according to direction (action) given
     def moveSnake(self, action):
@@ -43,40 +41,38 @@ class Game:
         clockwise = ['RIGHT', 'DOWN', 'LEFT', 'UP'] # clockwise rotation, (+) = right, (-) = left
         idx = clockwise.index(self.direction) # get direction index to rotate
 
-        if (action[0] == 1):
+        if (np.array_equal(action, [1, 0, 0])):
             newDirection = self.direction
-        elif (action[1] == 1): # right
-            newDirection = self.direction[(idx+1) % 4]
-        else: # left, action[2] == 1
-            newDirection = self.direction[(idx-1) % 4]
+        elif (np.array_equal(action, [0, 1, 0])): # right
+            newIdx = (idx+1) % 4
+            newDirection = clockwise[newIdx]
+        else: # left, [0, 0, 1]
+            newIdx = (idx-1) % 4
+            newDirection = clockwise[newIdx]
 
+        self.direction = newDirection
         # move according to newDirection
         if (newDirection == 'RIGHT'):
-            self.x += 1
+            self.x += 20
         elif (newDirection == 'LEFT'):
-            self.x -= 1
+            self.x -= 20
         elif (newDirection == 'UP'):
-            self.y -= 1
+            self.y -= 20
         elif (newDirection == 'DOWN'):
-            self.y += 1
-
-        self.snake.insert(0, (self.x * GRID_SIZE, self.y * GRID_SIZE))
-        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(self.snake[0][0], self.snake[0][1], BODY_SIZE, BODY_SIZE))
-        self.snake.pop()
+            self.y += 20
 
     # places food on random location other than snake location
     def placeFood(self):
         self.food = (np.random.randint(0, 24) * GRID_SIZE, np.random.randint(0, 24) * GRID_SIZE)
         while (self.food in self.snake):
             self.food = (np.random.randint(0, 24) * GRID_SIZE, np.random.randint(0, 24) * GRID_SIZE)
-        pygame.draw.rect(self.screen, FOOD_COLOR, pygame.Rect(self.food[0], self.food[1], BODY_SIZE, BODY_SIZE))    
 
     def checkCollision(self, point=None):
         # receives point, checks if the snake will collide if it went to that point
         if (point == None): point = self.snake[0]
-        x = point[0] / 20
-        y = point[1] / 20
-        return (x < 0 or y < 0 or x > 24 or y > 24 or (x * GRID_SIZE, y * GRID_SIZE) in self.snake[1:])
+        x = point[0]
+        y = point[1]
+        return (x < 0 or y < 0 or x > 480 or y > 480 or (x, y) in self.snake[1:])
         
     def startGame(self, action):
         reward = 0
@@ -89,12 +85,17 @@ class Game:
                 sys.exit()
 
         self.moveSnake(action)
-        self.drawSnake()
+        self.snake.insert(0, (self.x, self.y))
+        self.snake.pop()
         
+        self.updateUI()
+        pygame.display.flip()
         # finish if colliding / game went too long on that snake length
-        if (self.checkCollision or self.frameIteration > 100 * len(self.snake)):
+        if (self.checkCollision() or self.frameIteration > 100 * len(self.snake)):
             gameOver = True
             reward = -10
+            pygame.draw.rect(self.screen, FOOD_COLOR, pygame.rect.Rect(self.snake[0][0], self.snake[0][1], BODY_SIZE, BODY_SIZE))
+            pygame.display.flip()
             return reward, gameOver, self.score
         
         # snake eats food
@@ -105,7 +106,17 @@ class Game:
             reward = 10
 
         # game will wait for 15 frames
-        pygame.time.Clock().tick(15)
-        pygame.display.flip()
+        pygame.time.Clock().tick(40)
         
         return reward, gameOver, self.score 
+
+    def updateUI(self):
+        self.screen.fill(SCREEN_COLOR)
+
+        for body in self.snake:
+            pygame.draw.rect(self.screen, SNAKE_COLOR, pygame.Rect(body[0], body[1], BODY_SIZE, BODY_SIZE))
+
+        pygame.draw.rect(self.screen, FOOD_COLOR, pygame.Rect(self.food[0], self.food[1], BODY_SIZE, BODY_SIZE))    
+
+        text = font.render("Score: " + str(self.score), True, '#ffffff')
+        self.screen.blit(text, [0, 0])
