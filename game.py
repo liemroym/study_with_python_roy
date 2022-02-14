@@ -11,14 +11,17 @@ pygame.init()
 
 GRID_SIZE = 20
 PIECE_SIZE = 18
+
 SCREEN_SIZE = (800, 600)
-GAME_BOARD_START_POSITION = (200, 20)
+
+GAME_BOARD_POSITION = (200, 20)
 GAME_BOARD_SIZE = (10 * GRID_SIZE, 20 * GRID_SIZE)
+
+HOLD_BOARD_POSITION = (40, 40)
+HOLD_BOARD_SIZE = (6 * GRID_SIZE, 4 * GRID_SIZE)
 
 SCREEN_COLOR = (0, 0, 0)
 GAME_BOARD_COLOR = (50, 50, 50)
-
-
 
 PIECES = ['t', 'z', 's', 'j', 'l', 'i', 'o']
 
@@ -96,8 +99,12 @@ class Game:
                         self.current_tetromino.move_right()
                     elif event.key == pygame.K_c:
                         if (not self.held):
-                            self.hold_tetromino = self.current_tetromino
-                            self.current_tetromino = Tetromino(self.screen, random.choice(PIECES))
+                            self.held = True
+                            last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
+                            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_BOARD_POSITION[0] + 2 * GRID_SIZE, y=HOLD_BOARD_POSITION[1] + 2 * GRID_SIZE)    
+                            self.tetrominoes.remove(self.current_tetromino)
+                            self.current_tetromino = Tetromino(self.screen, random.choice(PIECES) if last_hold_tetromino == NULL else last_hold_tetromino) 
+                            self.tetrominoes.append(self.current_tetromino)
 
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_DOWN:
@@ -120,12 +127,12 @@ class Game:
         self.screen.fill(SCREEN_COLOR)
         # Hold piece
         pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(20, 20, 8 * GRID_SIZE, 6 * GRID_SIZE))
-        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(40, 40, 6 * GRID_SIZE, 4 * GRID_SIZE))
+        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(HOLD_BOARD_POSITION[0], HOLD_BOARD_POSITION[1], HOLD_BOARD_SIZE[0], HOLD_BOARD_SIZE[1]))
         if (self.hold_tetromino != NULL):
             self.hold_tetromino.draw()
 
         # Game board
-        pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(GAME_BOARD_START_POSITION[0], GAME_BOARD_START_POSITION[1], GAME_BOARD_SIZE[0], GAME_BOARD_SIZE[1]))
+        pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(GAME_BOARD_POSITION[0], GAME_BOARD_POSITION[1], GAME_BOARD_SIZE[0], GAME_BOARD_SIZE[1]))
         
         # Tetromino
         for tetromino in self.tetrominoes:
@@ -170,7 +177,7 @@ class Game:
     def check_line_clear(self):
         minoes_in_line : list[list[tuple(Tetromino, Mino)]]= []
 
-        for i in range(21):
+        for i in range(23):
             minoes_in_line.append([])
 
         for tetromino in self.tetrominoes:
@@ -182,6 +189,8 @@ class Game:
         for j, line in enumerate(minoes_in_line):
             if (len(line) == 10):
                 line_full.append(j)
+            elif (j == 0 and len(line) != 0):
+                print("DEAD")
         
         for line in line_full:
             for cleared_mino_pair in minoes_in_line[line]:
@@ -217,9 +226,9 @@ class Mino:
         # Check if left part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x - GRID_SIZE, self.y) not in coords):
-            if (self.x - GRID_SIZE < GAME_BOARD_START_POSITION[0]):
+            if (self.x - GRID_SIZE < GAME_BOARD_POSITION[0]):
                 return True
-            elif (self.y > GAME_BOARD_START_POSITION[1]):
+            elif (self.y > GAME_BOARD_POSITION[1]):
                 if (self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
                     return True
         return False
@@ -228,17 +237,17 @@ class Mino:
         # Check if right part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x + GRID_SIZE, self.y) not in coords):
-            if (self.x + GRID_SIZE > GAME_BOARD_SIZE[0]):
+            if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0]):
                 return True
-            elif (self.y > GAME_BOARD_START_POSITION[1]):
+            elif (self.y > GAME_BOARD_POSITION[1]):
                 if (self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
                     return True
         return False
         
 class Tetromino:
-    def __init__(self, screen, type):
-        self.x = (GAME_BOARD_START_POSITION[0] + GAME_BOARD_SIZE[0]) // (2 * 20)
-        self.y = GAME_BOARD_START_POSITION[1] // 20
+    def __init__(self, screen, type, x = None, y = None):
+        self.x = ((GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] // 2) - 2 * GRID_SIZE) if x == None else x
+        self.y = GAME_BOARD_POSITION[1] if y == None else y
         self.screen = screen
         self.bottom = False
         self.type = type    
@@ -257,8 +266,8 @@ class Tetromino:
         self.minoes.clear()
         self.coords.clear()
         for shape in PIECE_SHAPE[self.type][self.state]:
-            self.minoes.append(Mino((shape[0] + self.x) * GRID_SIZE, (shape[1] - 1 + self.y) * GRID_SIZE, self.screen, PIECE_COLOR[self.type]))
-            self.coords.append(((shape[0] + self.x) * GRID_SIZE, (shape[1] - 1 + self.y) * GRID_SIZE))
+            self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, PIECE_COLOR[self.type]))
+            self.coords.append(((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
 
     def check_collision_bottom(self):
         for mino in self.minoes:
@@ -272,7 +281,7 @@ class Tetromino:
 
     def fall(self):
         if (not self.check_collision_bottom()):  
-            self.y += 1
+            self.y += GRID_SIZE
             self.update()
 
     def check_collision_left(self):
@@ -283,7 +292,7 @@ class Tetromino:
 
     def move_left(self):
         if (not self.check_collision_left()):
-            self.x -= 1
+            self.x -= GRID_SIZE
             self.update()
 
     def check_collision_right(self):
@@ -294,7 +303,7 @@ class Tetromino:
 
     def move_right(self):
         if (not self.check_collision_right()):
-            self.x += 1
+            self.x += GRID_SIZE
             self.update()
 
     def rotate_cw(self):
