@@ -54,6 +54,34 @@ PIECE_SHAPE = {
     'o': [[(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)]],
 }
 
+# SRS wall kicks. Each row represents these state changes:
+# 0>>1
+# 1>>0
+# 1>>2
+# 2>>1
+# 2>>3
+# 3>>2
+# 3>>0
+# 0>>3
+
+OTHER_WALL_KICK = [[(-1, 0), (-1, 1), ( 0,-2), (-1,-2)],
+                   [( 1, 0), ( 1,-1), ( 0, 2), ( 1, 2)],
+                   [( 1, 0), ( 1,-1), ( 0, 2), ( 1, 2)],
+                   [(-1, 0), (-1, 1), ( 0,-2), (-1,-2)],
+                   [( 1, 0), ( 1, 1), ( 0,-2), ( 1,-2)],
+                   [(-1, 0), (-1,-1), ( 0, 2), (-1, 2)],
+                   [(-1, 0), (-1,-1), ( 0, 2), (-1, 2)],
+                   [( 1, 0), ( 1, 1), ( 0,-2), ( 1,-2)]]
+
+L_WALL_KICK = [[(-2, 0), ( 1, 0), (-2,-1), ( 1, 2)],
+               [( 2, 0), (-1, 0), ( 2, 1), (-1,-2)],
+               [(-1, 0), ( 2, 0), (-1, 2), ( 2,-1)],
+               [( 1, 0), (-2, 0), ( 1,-2), (-2, 1)],
+               [( 2, 0), (-1, 0), ( 2, 1), (-1,-2)],
+               [(-2, 0), ( 1, 0), (-2,-1), ( 1, 2)],
+               [( 1, 0), (-2, 0), ( 1,-2), (-2, 1)],
+               [(-1, 0), ( 2, 0), (-1, 2), ( 2,-1)]]
+
 FALL_COUNTER = 20
 LOCK_COUNTER = 30
 DAS_COUNTER = 10
@@ -194,8 +222,7 @@ class Game:
         if (self.next_bag == []):
             self.next_bag = PIECES.copy() 
             random.shuffle(self.next_bag)
-        
-        print(self.current_bag, self.next_bag)
+
         self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0))
         self.current_bag.append(self.next_bag.pop())
         self.tetrominoes.append(self.current_tetromino)
@@ -225,6 +252,7 @@ class Game:
             for line_falling in minoes_in_line[:line]:
                 for mino_pair in line_falling:
                     mino_pair[1].y += GRID_SIZE
+
 # Tetrominoes: pieces, minoes: tiles, official names prob
 class Mino:
     def __init__(self, x, y, screen, color):
@@ -234,9 +262,15 @@ class Mino:
         self.color = color
         self.width = PIECE_SIZE
         self.height = PIECE_SIZE
-
+        
     def draw(self):
         pygame.draw.rect(self.screen, self.color, pygame.Rect(self.x, self.y, self.width, self.height))
+
+    def check_collision_inside(self, coords):
+        if ((self.x, self.y) not in coords and self.y > GAME_BOARD_POSITION[1]):
+            if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) != GAME_BOARD_COLOR):
+                return True
+        return False
 
     def check_collision_bottom(self, coords):
         # Check if bottom part of the piece collide with something or not
@@ -293,8 +327,8 @@ class Tetromino:
         self.coords.clear()
         for shape in PIECE_SHAPE[self.type][self.state]:
             self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, PIECE_COLOR[self.type]))
-            self.coords.append(((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
-
+            self.coords.append((shape[0] * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
+            
     def check_collision_bottom(self):
         for mino in self.minoes:
             if (mino.check_collision_bottom(self.coords)):
@@ -333,16 +367,64 @@ class Tetromino:
             self.update()
 
     def rotate_cw(self):
+        prev_state = self.state
+        curr_coords = self.coords.copy()
         self.state = (self.state + 1) % 4
         self.update()
-        self.draw()
+        
+        safe = False
+        test = 0
+        if (self.type != 'o'):
+            while (not safe):
+                if (test == 3): break
+                for mino in self.minoes:
+                    if (mino.check_collision_inside(curr_coords)):
+                        if (self.type == 'l'):
+                            safe = False
+                            self.x += L_WALL_KICK[prev_state * 2][test][0] * GRID_SIZE
+                            self.y += L_WALL_KICK[prev_state * 2][test][1] * GRID_SIZE
+                            test += 1
+                            self.update()
+                        else:
+                            safe = False
+                            self.x += OTHER_WALL_KICK[prev_state * 2][test][0] * GRID_SIZE
+                            self.y += OTHER_WALL_KICK[prev_state * 2][test][1] * GRID_SIZE
+                            test += 1
+                            self.update()
+                        break
+                    safe = True
+
         pygame.display.flip()
 
     def rotate_ccw(self):
+        prev_state = self.state
+        curr_coords = self.coords.copy()
         self.state -= 1
         if (self.state == -1): self.state = 3
         self.update()
-        self.draw()
+        
+        safe = False
+        test = 0
+        if (self.type != 'o'):
+            while (not safe):
+                if (test == 3): break
+                for mino in self.minoes:
+                    if (mino.check_collision_inside(curr_coords)):
+                        if (self.type == 'l'):
+                            safe = False
+                            self.x += L_WALL_KICK[prev_state * 2][test][0] * GRID_SIZE
+                            self.y += L_WALL_KICK[prev_state * 2][test][1] * GRID_SIZE
+                            test += 1
+                            self.update()
+                        else:
+                            safe = False
+                            self.x += OTHER_WALL_KICK[prev_state * 2][test][0] * GRID_SIZE
+                            self.y += OTHER_WALL_KICK[prev_state * 2][test][1] * GRID_SIZE
+                            test += 1
+                            self.update()
+                        break
+                    safe = True
+
         pygame.display.flip()
 
     def hard_drop(self):
@@ -353,3 +435,4 @@ class Tetromino:
 
 if __name__ == "__main__":
     Game()
+    
