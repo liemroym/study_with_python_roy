@@ -1,10 +1,10 @@
 # For rotation system, refer to https://tetris.fandom.com/wiki/SRS
 # All the rotation are pre-determined following the wiki above (not using matrix calculation)
 
+# Conclusion: I suck at geometry
+
 from asyncio.windows_events import NULL
-from cmath import pi
 import random
-from matplotlib.pyplot import pie
 import pygame
 
 pygame.init()
@@ -14,11 +14,16 @@ PIECE_SIZE = 18
 
 SCREEN_SIZE = (800, 600)
 
-GAME_BOARD_POSITION = (200, 20)
+HOLD_PIECE_POSITION = (40, 40) # Black part
+PIECE_BOARD_SIZE = (6 * GRID_SIZE, 4 * GRID_SIZE)
+
+GAME_BOARD_POSITION = ((HOLD_PIECE_POSITION[0] + PIECE_BOARD_SIZE[0] + GRID_SIZE) + GRID_SIZE, HOLD_PIECE_POSITION[1] - GRID_SIZE)
 GAME_BOARD_SIZE = (10 * GRID_SIZE, 20 * GRID_SIZE)
 
-HOLD_BOARD_POSITION = (40, 40)
-HOLD_BOARD_SIZE = (6 * GRID_SIZE, 4 * GRID_SIZE)
+NEXT_PIECE_POSITION = ((GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] + GRID_SIZE) + GRID_SIZE, GAME_BOARD_POSITION[1] + GRID_SIZE)
+
+
+NEXT_PIECE = 5
 
 SCREEN_COLOR = (0, 0, 0)
 GAME_BOARD_COLOR = (50, 50, 50)
@@ -105,14 +110,14 @@ class Game:
                     elif event.key == pygame.K_c:
                         if (not self.held):
                             last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
-                            if (self.current_bag == []):
-                                self.current_bag = self.next_bag.copy()
-                                self.next_bag = PIECES
+                            if (self.next_bag == []):
+                                self.next_bag = PIECES.copy()
                                 random.shuffle(self.next_bag)
                             self.held = True
-                            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_BOARD_POSITION[0] + 2 * GRID_SIZE, y=HOLD_BOARD_POSITION[1] + 2 * GRID_SIZE)    
+                            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_PIECE_POSITION[0] + 2 * GRID_SIZE, y=HOLD_PIECE_POSITION[1] + 2 * GRID_SIZE)    
                             self.tetrominoes.remove(self.current_tetromino)
-                            self.current_tetromino = Tetromino(self.screen, self.current_bag.pop() if last_hold_tetromino == NULL else last_hold_tetromino) 
+                            self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0) if last_hold_tetromino == NULL else last_hold_tetromino) 
+                            self.current_bag.append(self.next_bag.pop())
                             self.tetrominoes.append(self.current_tetromino)
 
                 elif event.type == pygame.KEYUP:
@@ -135,13 +140,19 @@ class Game:
     def update_UI(self):
         self.screen.fill(SCREEN_COLOR)
         # Hold piece
-        pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(20, 20, 8 * GRID_SIZE, 6 * GRID_SIZE))
-        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(HOLD_BOARD_POSITION[0], HOLD_BOARD_POSITION[1], HOLD_BOARD_SIZE[0], HOLD_BOARD_SIZE[1]))
+        pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(HOLD_PIECE_POSITION[0] - GRID_SIZE, HOLD_PIECE_POSITION[1] - GRID_SIZE, PIECE_BOARD_SIZE[0] + GRID_SIZE * 2, PIECE_BOARD_SIZE[1] + GRID_SIZE * 2))
+        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(HOLD_PIECE_POSITION[0], HOLD_PIECE_POSITION[1], PIECE_BOARD_SIZE[0], PIECE_BOARD_SIZE[1]))
         if (self.hold_tetromino != NULL):
             self.hold_tetromino.draw()
 
         # Game board
         pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(GAME_BOARD_POSITION[0], GAME_BOARD_POSITION[1], GAME_BOARD_SIZE[0], GAME_BOARD_SIZE[1]))
+
+        # Next piece
+        pygame.draw.rect(self.screen, GAME_BOARD_COLOR, pygame.Rect(NEXT_PIECE_POSITION[0] - GRID_SIZE, NEXT_PIECE_POSITION[1] - GRID_SIZE, PIECE_BOARD_SIZE[0] + GRID_SIZE * 2, PIECE_BOARD_SIZE[1] * NEXT_PIECE - ((NEXT_PIECE-1) * GRID_SIZE) + GRID_SIZE * 2))
+        pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(NEXT_PIECE_POSITION[0], NEXT_PIECE_POSITION[1], PIECE_BOARD_SIZE[0], PIECE_BOARD_SIZE[1] * NEXT_PIECE - ((NEXT_PIECE-1) * GRID_SIZE)))
+        for i in range(NEXT_PIECE):
+            Tetromino(self.screen, self.current_bag[i], NEXT_PIECE_POSITION[0] + GRID_SIZE, (NEXT_PIECE_POSITION[1] * (i+1) + 2 * GRID_SIZE) + (GRID_SIZE * i)).draw()
         
         # Tetromino
         for tetromino in self.tetrominoes:
@@ -180,11 +191,13 @@ class Game:
         self.lock_counter = 0
         self.held = False
         self.check_line_clear()
-        if (self.current_bag == []):
-            self.current_bag = self.next_bag.copy()
-            self.next_bag = PIECES 
+        if (self.next_bag == []):
+            self.next_bag = PIECES.copy() 
             random.shuffle(self.next_bag)
-        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
+        
+        print(self.current_bag, self.next_bag)
+        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0))
+        self.current_bag.append(self.next_bag.pop())
         self.tetrominoes.append(self.current_tetromino)
 
     def check_line_clear(self):
@@ -250,7 +263,7 @@ class Mino:
         # Check if right part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x + GRID_SIZE, self.y) not in coords):
-            if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0]):
+            if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] - GRID_SIZE):
                 return True
             elif (self.y >= GAME_BOARD_POSITION[1]):
                 if (self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
