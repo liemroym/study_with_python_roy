@@ -57,7 +57,12 @@ class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode(SCREEN_SIZE)
         
-        self.current_tetromino = Tetromino(self.screen, random.choice(PIECES))
+        self.current_bag = PIECES.copy()
+        random.shuffle(self.current_bag)
+        self.next_bag = PIECES.copy()
+        random.shuffle(self.next_bag)
+        
+        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
         self.hold_tetromino = NULL
         self.held = False
 
@@ -99,11 +104,15 @@ class Game:
                         self.current_tetromino.move_right()
                     elif event.key == pygame.K_c:
                         if (not self.held):
-                            self.held = True
                             last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
+                            if (self.current_bag == []):
+                                self.current_bag = self.next_bag.copy()
+                                self.next_bag = PIECES
+                                random.shuffle(self.next_bag)
+                            self.held = True
                             self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_BOARD_POSITION[0] + 2 * GRID_SIZE, y=HOLD_BOARD_POSITION[1] + 2 * GRID_SIZE)    
                             self.tetrominoes.remove(self.current_tetromino)
-                            self.current_tetromino = Tetromino(self.screen, random.choice(PIECES) if last_hold_tetromino == NULL else last_hold_tetromino) 
+                            self.current_tetromino = Tetromino(self.screen, self.current_bag.pop() if last_hold_tetromino == NULL else last_hold_tetromino) 
                             self.tetrominoes.append(self.current_tetromino)
 
                 elif event.type == pygame.KEYUP:
@@ -171,7 +180,11 @@ class Game:
         self.lock_counter = 0
         self.held = False
         self.check_line_clear()
-        self.current_tetromino = Tetromino(self.screen, random.choice(PIECES))
+        if (self.current_bag == []):
+            self.current_bag = self.next_bag.copy()
+            self.next_bag = PIECES 
+            random.shuffle(self.next_bag)
+        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
         self.tetrominoes.append(self.current_tetromino)
 
     def check_line_clear(self):
@@ -228,7 +241,7 @@ class Mino:
         if ((self.x - GRID_SIZE, self.y) not in coords):
             if (self.x - GRID_SIZE < GAME_BOARD_POSITION[0]):
                 return True
-            elif (self.y > GAME_BOARD_POSITION[1]):
+            elif (self.y >= GAME_BOARD_POSITION[1]):
                 if (self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
                     return True
         return False
@@ -239,7 +252,7 @@ class Mino:
         if ((self.x + GRID_SIZE, self.y) not in coords):
             if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0]):
                 return True
-            elif (self.y > GAME_BOARD_POSITION[1]):
+            elif (self.y >= GAME_BOARD_POSITION[1]):
                 if (self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
                     return True
         return False
