@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import os
-
+import time
 
 class LinearQNet(nn.Module):
     def __init__(self, inputSize, hiddenSize, outputSize):
@@ -12,8 +12,11 @@ class LinearQNet(nn.Module):
         self.linear2 = nn.Linear(hiddenSize, outputSize)
 
     def forward(self, x):
+        # print("1", x)
         x = F.relu(self.linear1(x))
+        # print("2", x)
         x = self.linear2(x)
+        # print("3", x)
 
         return x
     

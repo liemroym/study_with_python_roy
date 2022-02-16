@@ -4,10 +4,9 @@ import pygame
 import sys
 import numpy as np
 import time
-from torch.autograd.grad_mode import F
 
 # Constants
-GRID_SIZE = 20
+GRID_SIZE = 20  
 BODY_SIZE = 18
 SCREEN_COLOR = (0, 0, 0)
 SNAKE_COLOR = (0, 255, 0)
@@ -105,7 +104,7 @@ class Game:
             self.score += 1
             reward = 10
 
-        # game will wait for 15 frames
+        # game will wait for 40 frames
         pygame.time.Clock().tick(40)
         
         return reward, gameOver, self.score 

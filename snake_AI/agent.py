@@ -21,7 +21,7 @@ class Agent:
         self.epsilon = 0 # randomness, used for early random moves
         self.gamma = 0.9 # discount rate, used in Bell equation
         self.memory = deque(maxlen=MAX_MEMORY) # data structure, for saving memories (currstate, action, etc)
-        self.model = LinearQNet(11, 512, 3)
+        self.model = LinearQNet(11, 256, 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def getState(self, game):
@@ -129,6 +129,8 @@ def train():
         #     print("RIGHT")
         # else:
         #     print("LEFT")
+
+        # get state --> get move prediction 
 
         reward, gameOver, score = game.startGame(move)
         newState = agent.getState(game)
