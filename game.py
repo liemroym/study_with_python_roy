@@ -1,10 +1,11 @@
 # For rotation system, refer to https://tetris.fandom.com/wiki/SRS
 # All the rotation are pre-determined following the wiki above (not using matrix calculation)
 
-# Conclusion: I suck at geometry
+# Conclusion: I suck at geometry. I suck at naming. I suck at coding in general
 
 from asyncio.windows_events import NULL
 import random
+from turtle import right
 import pygame
 
 pygame.init()
@@ -40,6 +41,16 @@ PIECE_COLOR = {
     'o': (255, 255, 0),  # yellow
 }
 
+GHOST_COLOR = {
+    't': (104, 0, 155), # purple
+    'z': (175, 0, 0), # red
+    's': (0, 175, 0), # green
+    'j': (0, 0, 175), # blue
+    'l': (205, 115, 0), # orange
+    'i': (14, 194, 158), # aqua
+    'o': (175, 175, 0) # yellow
+}
+
 # Each index represents the rotation state (refer to tetris wiki on SRS), index 0 is the spawn state
 # Pieces were read from left to right, for each column do top to bottom reading. 
 # Rotation doesn't use matrix calculation
@@ -65,7 +76,6 @@ PIECE_WIDTH = {
     'o': 2
 }
 
-GHOST_OPACITY = 0
 # SRS wall kicks. Each row represents these state changes:
 # 0>>1
 # 1>>0
@@ -121,6 +131,7 @@ class Game:
         self.lock_counter = 0
         self.DAS_counter = 0
 
+        self.update_ghost()
         self.main()
 
     def main(self):
@@ -170,10 +181,11 @@ class Game:
                         self.DAS_right_controller = False
 
             self.check_move()
+            self.handle_fall()
             self.update_UI()
-            self.handle_fall()            
-            self.handle_ghost()
-        
+            self.update_ghost()
+            self.current_tetromino.draw()
+
             pygame.display.flip()
             pygame.time.Clock().tick(60)
 
@@ -193,8 +205,8 @@ class Game:
         pygame.draw.rect(self.screen, SCREEN_COLOR, pygame.Rect(NEXT_PIECE_POSITION[0], NEXT_PIECE_POSITION[1], PIECE_BOARD_SIZE[0], PIECE_BOARD_SIZE[1] * NEXT_PIECE - ((NEXT_PIECE-1) * GRID_SIZE)))
         for i in range(NEXT_PIECE):
             Tetromino(self.screen, self.current_bag[i], NEXT_PIECE_POSITION[0] + GRID_SIZE, (NEXT_PIECE_POSITION[1] * (i+1) + 2 * GRID_SIZE) + (GRID_SIZE * i)).draw()
-        
-        # Tetromino
+
+        # Tetrominoes
         for tetromino in self.tetrominoes:
             tetromino.draw()
 
@@ -264,9 +276,9 @@ class Game:
             for line_falling in minoes_in_line[:line]:
                 for mino_pair in line_falling:
                     mino_pair[1].y += GRID_SIZE
-
-    def handle_ghost(self):
-        self.ghost_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=self.current_tetromino.x, y=self.current_tetromino.y + GRID_SIZE, ghost=self.current_tetromino.state)
+    
+    def update_ghost(self):
+        self.ghost_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=self.current_tetromino.x, y=self.current_tetromino.y, ghost_state=self.current_tetromino.state)
         self.ghost_tetromino.hard_drop()
         self.ghost_tetromino.draw()
 
@@ -285,18 +297,19 @@ class Mino:
 
     def check_collision_inside(self, coords):
         if ((self.x, self.y) not in coords and self.y > GAME_BOARD_POSITION[1]):
-            if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2))[3] != GHOST_OPACITY):
-                if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) != GAME_BOARD_COLOR):
-                    return True
+            inside_color = self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) 
+            if (inside_color != GAME_BOARD_COLOR and inside_color not in GHOST_COLOR.values()):
+                return True
         return False
 
     def check_collision_bottom(self, coords):
         # Check if bottom part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x, self.y + GRID_SIZE) not in coords):
+            bottom_color = self.screen.get_at((self.x + (GRID_SIZE // 2), self.y + GRID_SIZE + (GRID_SIZE // 2))) 
             if (self.y + GRID_SIZE > GAME_BOARD_SIZE[1]):
                 return True
-            elif (self.screen.get_at((self.x + (GRID_SIZE // 2), self.y + GRID_SIZE + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
+            elif (bottom_color != GAME_BOARD_COLOR and bottom_color not in GHOST_COLOR.values()): 
                 return True
         return False
         
@@ -304,10 +317,11 @@ class Mino:
         # Check if left part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x - GRID_SIZE, self.y) not in coords):
+            left_color = self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
             if (self.x - GRID_SIZE < GAME_BOARD_POSITION[0]):
                 return True
             elif (self.y >= GAME_BOARD_POSITION[1]):
-                if (self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
+                if (left_color != GAME_BOARD_COLOR and left_color not in GHOST_COLOR.values()): 
                     return True
         return False
         
@@ -315,15 +329,16 @@ class Mino:
         # Check if right part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x + GRID_SIZE, self.y) not in coords):
+            right_color = self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
             if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] - GRID_SIZE):
                 return True
             elif (self.y >= GAME_BOARD_POSITION[1]):
-                if (self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) != GAME_BOARD_COLOR): 
+                if (right_color != GAME_BOARD_COLOR and right_color not in GHOST_COLOR.values()): 
                     return True
         return False
         
 class Tetromino:
-    def __init__(self, screen, type, x = None, y = None, ghost=None):
+    def __init__(self, screen, type, x=None, y=None, ghost_state=None):
         self.x = ((GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] // 2) - 2 * GRID_SIZE) if x == None else x
         self.y = GAME_BOARD_POSITION[1] if y == None else y
         self.screen = screen
@@ -331,14 +346,13 @@ class Tetromino:
         self.type = type    
         self.minoes : list[Mino] = []
         self.coords = []
-        if (ghost == None):
-            self.state = 0 # for rotating. 0 for spawn state, 0>1>2>3 (refer to the SRS state naming convention)
-            self.opacity = 255
-        else:
-            self.state = ghost
-            self.opacity = GHOST_OPACITY
-        self.soft_drop_controller = False
 
+        if (ghost_state == None):
+            self.state = 0 # for rotating. 0 for spawn state, 0>1>2>3 (refer to the SRS wall kick naming convention)    
+            self.color = PIECE_COLOR[type]
+        else:
+            self.state = ghost_state # for rotating. 0 for spawn state, 0>1>2>3 (refer to the SRS wall kick naming convention)    
+            self.color = GHOST_COLOR[type]
         self.update()
         
     def draw(self):
@@ -349,7 +363,7 @@ class Tetromino:
         self.minoes.clear()
         self.coords.clear()
         for shape in PIECE_SHAPE[self.type][self.state]:
-            self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, PIECE_COLOR[self.type] + (GHOST_OPACITY,)))
+            self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, self.color))
             self.coords.append((shape[0] * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
             
     def check_collision_bottom(self):
