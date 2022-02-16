@@ -54,6 +54,18 @@ PIECE_SHAPE = {
     'o': [[(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)], [(1, 0), (1, 1), (2, 0), (2, 1)]],
 }
 
+# For centering the piece
+PIECE_WIDTH = {
+    't': 3,
+    'z': 3,
+    's': 3,
+    'j': 3,
+    'l': 3,
+    'i': 4,
+    'o': 2
+}
+
+GHOST_OPACITY = 0
 # SRS wall kicks. Each row represents these state changes:
 # 0>>1
 # 1>>0
@@ -147,7 +159,6 @@ class Game:
                             self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0) if last_hold_tetromino == NULL else last_hold_tetromino) 
                             self.current_bag.append(self.next_bag.pop())
                             self.tetrominoes.append(self.current_tetromino)
-
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_DOWN:
                         self.soft_drop_controller = False
@@ -161,7 +172,8 @@ class Game:
             self.check_move()
             self.update_UI()
             self.handle_fall()            
-
+            self.handle_ghost()
+        
             pygame.display.flip()
             pygame.time.Clock().tick(60)
 
@@ -253,6 +265,11 @@ class Game:
                 for mino_pair in line_falling:
                     mino_pair[1].y += GRID_SIZE
 
+    def handle_ghost(self):
+        self.ghost_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=self.current_tetromino.x, y=self.current_tetromino.y + GRID_SIZE, ghost=self.current_tetromino.state)
+        self.ghost_tetromino.hard_drop()
+        self.ghost_tetromino.draw()
+
 # Tetrominoes: pieces, minoes: tiles, official names prob
 class Mino:
     def __init__(self, x, y, screen, color):
@@ -268,8 +285,9 @@ class Mino:
 
     def check_collision_inside(self, coords):
         if ((self.x, self.y) not in coords and self.y > GAME_BOARD_POSITION[1]):
-            if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) != GAME_BOARD_COLOR):
-                return True
+            if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2))[3] != GHOST_OPACITY):
+                if (self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) != GAME_BOARD_COLOR):
+                    return True
         return False
 
     def check_collision_bottom(self, coords):
@@ -305,7 +323,7 @@ class Mino:
         return False
         
 class Tetromino:
-    def __init__(self, screen, type, x = None, y = None):
+    def __init__(self, screen, type, x = None, y = None, ghost=None):
         self.x = ((GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] // 2) - 2 * GRID_SIZE) if x == None else x
         self.y = GAME_BOARD_POSITION[1] if y == None else y
         self.screen = screen
@@ -313,7 +331,12 @@ class Tetromino:
         self.type = type    
         self.minoes : list[Mino] = []
         self.coords = []
-        self.state = 0 # for rotating. 0 for spawn state, 0>1>2>3 (refer to the SRS state naming convention)
+        if (ghost == None):
+            self.state = 0 # for rotating. 0 for spawn state, 0>1>2>3 (refer to the SRS state naming convention)
+            self.opacity = 255
+        else:
+            self.state = ghost
+            self.opacity = GHOST_OPACITY
         self.soft_drop_controller = False
 
         self.update()
@@ -326,7 +349,7 @@ class Tetromino:
         self.minoes.clear()
         self.coords.clear()
         for shape in PIECE_SHAPE[self.type][self.state]:
-            self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, PIECE_COLOR[self.type]))
+            self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, PIECE_COLOR[self.type] + (GHOST_OPACITY,)))
             self.coords.append((shape[0] * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
             
     def check_collision_bottom(self):
@@ -368,6 +391,8 @@ class Tetromino:
 
     def rotate_cw(self):
         prev_state = self.state
+        prev_x = self.x
+        prev_y = self.y
         curr_coords = self.coords.copy()
         self.state = (self.state + 1) % 4
         self.update()
@@ -376,7 +401,13 @@ class Tetromino:
         test = 0
         if (self.type != 'o'):
             while (not safe):
-                if (test == 3): break
+                if (test == 4): 
+                    self.x = prev_x
+                    self.y = prev_y
+                    self.state -= 1
+                    if (self.state == -1): self.state = 3
+                    self.update()
+                    break
                 for mino in self.minoes:
                     if (mino.check_collision_inside(curr_coords)):
                         if (self.type == 'l'):
@@ -398,6 +429,8 @@ class Tetromino:
 
     def rotate_ccw(self):
         prev_state = self.state
+        prev_x = self.x
+        prev_y = self.y
         curr_coords = self.coords.copy()
         self.state -= 1
         if (self.state == -1): self.state = 3
@@ -407,7 +440,12 @@ class Tetromino:
         test = 0
         if (self.type != 'o'):
             while (not safe):
-                if (test == 3): break
+                if (test == 4): 
+                    self.x = prev_x
+                    self.y = prev_y
+                    self.state = (self.state + 1) % 4
+                    self.update()
+                    break
                 for mino in self.minoes:
                     if (mino.check_collision_inside(curr_coords)):
                         if (self.type == 'l'):
