@@ -5,7 +5,6 @@
 
 from asyncio.windows_events import NULL
 import random
-from turtle import right
 import pygame
 
 pygame.init()
