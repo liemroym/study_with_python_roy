@@ -13,7 +13,7 @@ SNAKE_COLOR = (0, 255, 0)
 FOOD_COLOR = (255, 0, 0)
 
 pygame.init()
-font = pygame.font.Font('Roboto-Medium.ttf', 25)
+font = pygame.font.SysFont('Roboto-Medium.ttf', 25)
 
 class Game:
     def __init__(self):

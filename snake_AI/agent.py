@@ -84,6 +84,8 @@ class Agent:
         self.trainer.trainStep(currState, action, reward, newState, gameOver)
     
     # train for 1 batch (BATCH_NUMBER currState, ...)
+    # link about zip(*list)
+    # https://www.google.com/search?q=zip(*list)+python&rlz=1C1GCEB_enID966ID966&oq=zip(&aqs=chrome.2.69i57j0i512j0i20i263i512j0i512l4j69i61.3942j0j7&sourceid=chrome&ie=UTF-8
     def trainLong(self):
         if len(self.memory) > BATCH_SIZE:
             sample = random.sample(self.memory, BATCH_SIZE)
