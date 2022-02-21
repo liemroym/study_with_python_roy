@@ -5,7 +5,6 @@
 
 from asyncio.windows_events import NULL
 import random
-import sys
 import pygame
 
 pygame.init()
@@ -134,49 +133,51 @@ class Game:
         self.update_ghost()
         self.main()
 
-    def start(self):
-        # event loop
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_x:
-                    self.current_tetromino.rotate_cw()
-                elif event.key == pygame.K_z:
-                    self.current_tetromino.rotate_ccw()
-                elif event.key == pygame.K_DOWN:
-                    self.soft_drop_controller = True
-                elif event.key == pygame.K_UP:
-                    self.current_tetromino.hard_drop()
-                    self.lock_tetromino()
-                elif event.key == pygame.K_LEFT:
-                    self.DAS_left_controller = True
-                    self.current_tetromino.move_left()
-                elif event.key == pygame.K_RIGHT:
-                    self.DAS_right_controller = True
-                    self.current_tetromino.move_right()
-                elif event.key == pygame.K_c:
-                    if (not self.held):
-                        last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
-                        if (self.next_bag == []):
-                            self.next_bag = PIECES.copy()
-                            random.shuffle(self.next_bag)
-                        self.held = True
-                        self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_PIECE_POSITION[0] + 2 * GRID_SIZE, y=HOLD_PIECE_POSITION[1] + 2 * GRID_SIZE)    
-                        self.tetrominoes.remove(self.current_tetromino)
-                        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0) if last_hold_tetromino == NULL else last_hold_tetromino) 
-                        self.current_bag.append(self.next_bag.pop())
-                        self.tetrominoes.append(self.current_tetromino)
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_DOWN:
-                    self.soft_drop_controller = False
-                elif event.key == pygame.K_LEFT:
-                    self.DAS_counter = 0
-                    self.DAS_left_controller = False
-                elif event.key == pygame.K_RIGHT:
-                    self.DAS_counter = 0
-                    self.DAS_right_controller = False
+    def main(self):
+        # forever loop
+        running = True
+        while running:
+            # event loop
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_x:
+                        self.current_tetromino.rotate_cw()
+                    elif event.key == pygame.K_z:
+                        self.current_tetromino.rotate_ccw()
+                    elif event.key == pygame.K_DOWN:
+                        self.soft_drop_controller = True
+                    elif event.key == pygame.K_UP:
+                        self.current_tetromino.hard_drop()
+                        self.lock_tetromino()
+                    elif event.key == pygame.K_LEFT:
+                        self.DAS_left_controller = True
+                        self.current_tetromino.move_left()
+                    elif event.key == pygame.K_RIGHT:
+                        self.DAS_right_controller = True
+                        self.current_tetromino.move_right()
+                    elif event.key == pygame.K_c:
+                        if (not self.held):
+                            last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
+                            if (self.next_bag == []):
+                                self.next_bag = PIECES.copy()
+                                random.shuffle(self.next_bag)
+                            self.held = True
+                            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_PIECE_POSITION[0] + 2 * GRID_SIZE, y=HOLD_PIECE_POSITION[1] + 2 * GRID_SIZE)    
+                            self.tetrominoes.remove(self.current_tetromino)
+                            self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0) if last_hold_tetromino == NULL else last_hold_tetromino) 
+                            self.current_bag.append(self.next_bag.pop())
+                            self.tetrominoes.append(self.current_tetromino)
+                elif event.type == pygame.KEYUP:
+                    if event.key == pygame.K_DOWN:
+                        self.soft_drop_controller = False
+                    elif event.key == pygame.K_LEFT:
+                        self.DAS_counter = 0
+                        self.DAS_left_controller = False
+                    elif event.key == pygame.K_RIGHT:
+                        self.DAS_counter = 0
+                        self.DAS_right_controller = False
 
             self.check_move()
             self.handle_fall()
