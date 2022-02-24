@@ -66,15 +66,15 @@ PIECE_SHAPE = {
 }
 
 # For centering the piece
-PIECE_WIDTH = {
-    't': 3,
-    'z': 3,
-    's': 3,
-    'j': 3,
-    'l': 3,
-    'i': 4,
-    'o': 2
-}
+# PIECE_WIDTH = {
+#     't': 3,
+#     'z': 3,
+#     's': 3,
+#     'j': 3,
+#     'l': 3,
+#     'i': 4,
+#     'o': 2
+# }
 
 # SRS wall kicks. Each row represents these state changes:
 # 0>>1
@@ -105,7 +105,8 @@ L_WALL_KICK = [[(-2, 0), ( 1, 0), (-2,-1), ( 1, 2)],
                [(-1, 0), ( 2, 0), (-1, 2), ( 2,-1)]]
 
 FALL_COUNTER = 20
-LOCK_COUNTER = 30
+LOCK_COUNTER = 50
+SPIN_DELAY = 10
 DAS_COUNTER = 10
 
 class Game:
@@ -118,15 +119,7 @@ class Game:
         random.shuffle(self.next_bag)
         
         self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
-        self.actions = [
-            self.current_tetromino.rotate_cw,
-            self.current_tetromino.rotate_ccw,
-            self.current_tetromino.fall,
-            self.current_tetromino.hard_drop,
-            self.current_tetromino.move_left,
-            self.current_tetromino.move_right,
-            self.handle_hold
-        ]
+        self.spin_counter = SPIN_DELAY
         self.hold_tetromino = NULL
         self.held = False
 
@@ -135,43 +128,19 @@ class Game:
         self.gravity_counter = 0
         self.lock_counter = 0
         self.DAS_counter = 0
+        self.stall_counter = 0
 
         self.update_ghost()
 
-    def get_state(self):
-        # event loop
+    def start(self, action):
+        # event loop to prevent not responding
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_x:
-                    self.current_tetromino.rotate_cw()
-                elif event.key == pygame.K_z:
-                    self.current_tetromino.rotate_ccw()
-                elif event.key == pygame.K_DOWN:
-                    self.soft_drop_controller = True
-                elif event.key == pygame.K_UP:
-                    self.current_tetromino.hard_drop()
-                    self.lock_tetromino()
-                elif event.key == pygame.K_LEFT:
-                    self.DAS_left_controller = True
-                    self.current_tetromino.move_left()
-                elif event.key == pygame.K_RIGHT:
-                    self.DAS_right_controller = True
-                    self.current_tetromino.move_right()
-                elif event.key == pygame.K_c:
-                    self.handle_hold()
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_DOWN:
-                    self.soft_drop_controller = False
-                elif event.key == pygame.K_LEFT:
-                    self.DAS_counter = 0
-                    self.DAS_left_controller = False
-                elif event.key == pygame.K_RIGHT:
-                    self.DAS_counter = 0
-                    self.DAS_right_controller = False
 
+        if (self.spin_counter != SPIN_DELAY): self.spin_counter += 1
+        self.play_move(action)
         self.handle_fall()
         self.update_UI()
         self.update_ghost()
@@ -179,13 +148,6 @@ class Game:
 
         pygame.display.flip()
         pygame.time.Clock().tick(60)
-        
-        coords = []
-        for tetromino in self.tetrominoes:
-            for coord in tetromino.coords:
-                coords.append(coord)
-            
-        return coords
 
     def update_UI(self):
         self.screen.fill(SCREEN_COLOR)
@@ -208,10 +170,25 @@ class Game:
         for tetromino in self.tetrominoes:
             tetromino.draw()
 
-    def check_move(self, actions):
-        for i, action in enumerate(actions):
-            if (action):
-                self.actions[i]()
+    def play_move(self, action):
+        if (action[0] or action[1]):
+            if (self.spin_counter == SPIN_DELAY):
+                if (action[0]):
+                    self.current_tetromino.rotate_cw()
+                elif (action[1]):
+                    self.current_tetromino.rotate_ccw()
+                self.spin_counter = 0
+        elif (action[2]):
+            self.current_tetromino.fall()
+        elif (action[3]):
+            self.current_tetromino.hard_drop()
+        elif (action[4]):
+            self.current_tetromino.move_left()
+        elif (action[5]):
+            self.current_tetromino.move_right()
+        elif (action[6]):
+            self.handle_hold()
+
         # Handle DAS and soft drop
         # if (self.soft_drop_controller and not self.current_tetromino.check_collision_bottom()):
         #     self.current_tetromino.fall()
@@ -235,14 +212,17 @@ class Game:
 
         if (self.current_tetromino.bottom):
             self.lock_counter += 1
+            self.stall_counter += 2
         else:
-            self.lock_counter = 0
+            self.lock_counter = self.stall_counter 
 
-        if (self.lock_counter == LOCK_COUNTER):
+        if (self.lock_counter >= LOCK_COUNTER):
             self.lock_tetromino()
 
     def lock_tetromino(self):
+        while (not self.current_tetromino.check_collision_bottom()): self.current_tetromino.fall()
         self.lock_counter = 0
+        self.stall_counter = 0
         self.held = False
         self.check_line_clear()
         if (self.next_bag == []):
@@ -332,10 +312,10 @@ class Mino:
         # Check if left part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x - GRID_SIZE, self.y) not in coords):
-            left_color = self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
             if (self.x - GRID_SIZE < GAME_BOARD_POSITION[0]):
                 return True
             elif (self.y >= GAME_BOARD_POSITION[1]):
+                left_color = self.screen.get_at((self.x - GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
                 if (left_color != GAME_BOARD_COLOR and left_color not in GHOST_COLOR.values()): 
                     return True
         return False
@@ -344,10 +324,10 @@ class Mino:
         # Check if right part of the piece collide with something or not
         # Don't check colission with fellow pieces
         if ((self.x + GRID_SIZE, self.y) not in coords):
-            right_color = self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
             if (self.x + GRID_SIZE > GAME_BOARD_POSITION[0] + GAME_BOARD_SIZE[0] - GRID_SIZE):
                 return True
             elif (self.y >= GAME_BOARD_POSITION[1]):
+                right_color = self.screen.get_at((self.x + GRID_SIZE + (GRID_SIZE // 2), self.y + (GRID_SIZE // 2))) 
                 if (right_color != GAME_BOARD_COLOR and right_color not in GHOST_COLOR.values()): 
                     return True
         return False
