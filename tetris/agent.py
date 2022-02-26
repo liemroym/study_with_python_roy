@@ -1,7 +1,7 @@
 from collections import deque
 import random
-from time import sleep
 import numpy as np
+from time import sleep
 import torch
 
 from game import Game, GAME_BOARD_POSITION, GRID_SIZE
@@ -38,18 +38,8 @@ class Agent():
             # 5. move_right
             # 6. hold
         self.model : Model = Model(208, 256, 7)
-        self.trainer : QTrainer = QTrainer()
+        self.trainer : QTrainer = QTrainer(self.model, 0.01, 0.9)
         self.count = 0
-        pass
-
-    def get_state(self, game : Game):
-        coords = np.zeros((20, 10))
-
-        for tetromino in game.tetrominoes:
-            for coord in tetromino.coords:
-                coords[(coord[1] // 20)- 1][(coord[0] - GAME_BOARD_POSITION[0]) // 20] = 1        
-
-        return coords
 
     def get_action(self, state):
         self.epsilon = N_OF_RANDOMNESS - self.ngames
@@ -63,26 +53,32 @@ class Agent():
 
         return action
 
-    def train_short(self):
-        self.trainer.train_step()
+    def train_short(self, state_curr, action, state_after, reward, game_finished):
+        self.trainer.train_step(state_curr, action, state_after, reward, game_finished)
 
-    def train_long(self):
-        pass
+    def train_long(self):   
+        sample = random.sample(list(self.memory), BATCH_SIZE)
 
-    def save(self):
-        pass
+        state_currs, actions, state_afters, rewards, game_finisheds = zip(*sample)
+        self.trainer.train_step(state_currs, actions, state_afters, rewards, game_finisheds)
 
-
+    def save(self, state_curr, action, state_after, reward, game_finished, score):
+        self.memory.append((state_curr, action, state_after, reward, game_finished, score))
 
 def train():
     game = Game()
     agent = Agent()
     while True:
-        curr_state = agent.get_state(game)
-        action = agent.get_action(curr_state)
+        state_curr = game.get_state()
+        action = agent.get_action(state_curr)
         # action = [0, 0, 0, 0, 1, 0, 0]
-        game.start(action)
-        # reward, game_finished = game.get_state()
+        reward, game_finished, score = game.start(action)
+        state_after = game.get_state()
+        agent.train_short(state_curr, action, state_after, reward, game_finished)
+        agent.save(state_curr, action, state_after, reward, game_finished, score)
+        if (game_finished):
+            game.reset()
+        #  game.get_state()
         # agent.train_short()
         # agent.save()
 

@@ -6,7 +6,9 @@
 from asyncio.windows_events import NULL
 import random
 import sys
+from tabnanny import check
 import pygame
+import numpy as np
 
 pygame.init()
 
@@ -109,30 +111,17 @@ LOCK_COUNTER = 50
 SPIN_DELAY = 10
 DAS_COUNTER = 10
 
+AROUND = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode(SCREEN_SIZE)
         
-        self.current_bag = PIECES.copy()
-        random.shuffle(self.current_bag)
-        self.next_bag = PIECES.copy()
-        random.shuffle(self.next_bag)
-        
-        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
-        self.spin_counter = SPIN_DELAY
-        self.hold_tetromino = NULL
-        self.held = False
-
-        self.tetrominoes = [self.current_tetromino]
-        
-        self.gravity_counter = 0
-        self.lock_counter = 0
-        self.DAS_counter = 0
-        self.stall_counter = 0
-
+        self.reset()
         self.update_ghost()
 
     def start(self, action):
+        self.reward = 0
         # event loop to prevent not responding
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -146,8 +135,13 @@ class Game:
         self.update_ghost()
         self.current_tetromino.draw()
 
+        coords = self.get_state(board_only=True)
+        reward_checker = RewardChecker()
+        self.reward += reward_checker.count_reward(coords)
         pygame.display.flip()
         pygame.time.Clock().tick(60)
+
+        return self.reward, self.finished, self.score
 
     def update_UI(self):
         self.screen.fill(SCREEN_COLOR)
@@ -169,6 +163,28 @@ class Game:
         # Tetrominoes
         for tetromino in self.tetrominoes:
             tetromino.draw()
+
+    def get_state(self, board_only=False):
+        coords = np.zeros((20, 10))
+
+        for tetromino in self.tetrominoes:
+            for coord in tetromino.coords:
+                coords[(coord[1] // 20)- 1][(coord[0] - GAME_BOARD_POSITION[0]) // 20] = 1        
+
+        if (board_only): return coords
+        # (80, 60) (100, 60) (120, 60) (140, 60)
+        # (80, 80) (100, 80) (120, 80) (140, 80)
+        hold_coords = np.zeros((2, 4))
+        if (self.hold_tetromino != NULL):
+            for coord in self.hold_tetromino.coords:
+                hold_coords[(coord[1] - 60) // GRID_SIZE][(coord[0] - 60) // GRID_SIZE] = 1
+
+        coords = coords.flatten()
+        hold_coords = hold_coords.flatten()
+        
+        coords = np.concatenate((coords, hold_coords))
+        
+        return coords
 
     def play_move(self, action):
         if (action[0] or action[1]):
@@ -230,6 +246,10 @@ class Game:
             random.shuffle(self.next_bag)
 
         self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0))
+        if (self.current_tetromino.check_collision_inside()):
+            self.finished = True
+            return
+            
         self.current_bag.append(self.next_bag.pop())
         self.tetrominoes.append(self.current_tetromino)
 
@@ -249,8 +269,10 @@ class Game:
             if (len(line) == 10):
                 line_full.append(j)
             elif (j == 0 and len(line) != 0):
-                print("DEAD")
+                self.finished = True
         
+        if (len(line_full) != 0): self.finished = False
+
         for line in line_full:
             for cleared_mino_pair in minoes_in_line[line]:
                 cleared_mino_pair[0].minoes.remove(cleared_mino_pair[1])
@@ -258,7 +280,10 @@ class Game:
             for line_falling in minoes_in_line[:line]:
                 for mino_pair in line_falling:
                     mino_pair[1].y += GRID_SIZE
-    
+
+        self.score += len(line_full)
+        self.reward += len(line_full) * 20
+
     def handle_hold(self):
         if (not self.held):
             last_hold_tetromino = self.hold_tetromino.type if self.hold_tetromino != NULL else NULL
@@ -266,7 +291,7 @@ class Game:
                 self.next_bag = PIECES.copy()
                 random.shuffle(self.next_bag)
             self.held = True
-            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_PIECE_POSITION[0] + 2 * GRID_SIZE, y=HOLD_PIECE_POSITION[1] + 2 * GRID_SIZE)    
+            self.hold_tetromino = Tetromino(self.screen, self.current_tetromino.type, x=HOLD_PIECE_POSITION[0] + GRID_SIZE, y=HOLD_PIECE_POSITION[1] + 2 * GRID_SIZE)    
             self.tetrominoes.remove(self.current_tetromino)
             self.current_tetromino = Tetromino(self.screen, self.current_bag.pop(0) if last_hold_tetromino == NULL else last_hold_tetromino) 
             self.current_bag.append(self.next_bag.pop())
@@ -277,6 +302,58 @@ class Game:
         self.ghost_tetromino.hard_drop()
         self.ghost_tetromino.draw()
 
+    def reset(self):
+        self.current_bag = PIECES.copy()
+        random.shuffle(self.current_bag)
+        self.next_bag = PIECES.copy()
+        random.shuffle(self.next_bag)
+        
+        self.current_tetromino = Tetromino(self.screen, self.current_bag.pop())
+        self.spin_counter = SPIN_DELAY
+        self.hold_tetromino = NULL
+        self.held = False
+
+        self.tetrominoes = [self.current_tetromino]
+        
+        self.gravity_counter = 0
+        self.lock_counter = 0
+        self.DAS_counter = 0
+        self.stall_counter = 0
+
+        self.finished = False
+        self.score = 0
+        self.reward = 0
+
+        self.update_ghost()
+
+class RewardChecker():
+    def count_reward(self, coords):
+        reward = 0
+        # Count holes
+        for i, line in enumerate(coords):
+            for j, col in enumerate(line):
+                if (col == 1 and i != 19):
+                    if (coords[i+1][j] == 0):
+                        if (self.check_hole(j, i)):
+                            reward -= 10
+        return reward
+
+    def check_hole(self, x, y, traversed=[], len=0):
+        if (len == 10): return False
+        hole = True
+        for dir in AROUND:
+            next_x = x+dir[0]
+            next_y = y+dir[1]
+            if (next_x > 0 and next_x < 10 and next_y > 19 and next_y > 0):
+                if ((next_x, next_y) not in traversed and self.coords[next_y][next_x] == 0):
+                    traversed.append((x, y))
+                    hole = self.check_hole(next_x, next_y, traversed, len=len+1)
+
+        return hole
+        
+                
+
+                
 # Tetrominoes: pieces, minoes: tiles, official names prob
 class Mino:
     def __init__(self, x, y, screen, color):
@@ -291,7 +368,7 @@ class Mino:
         pygame.draw.rect(self.screen, self.color, pygame.Rect(self.x, self.y, self.width, self.height))
 
     def check_collision_inside(self, coords):
-        if ((self.x, self.y) not in coords and self.y > GAME_BOARD_POSITION[1]):
+        if ((self.x, self.y) not in coords and self.y >= GAME_BOARD_POSITION[1]):
             inside_color = self.screen.get_at((self.x + GRID_SIZE // 2, self.y + GRID_SIZE // 2)) 
             if (inside_color != GAME_BOARD_COLOR and inside_color not in GHOST_COLOR.values()):
                 return True
@@ -360,7 +437,13 @@ class Tetromino:
         for shape in PIECE_SHAPE[self.type][self.state]:
             self.minoes.append(Mino((shape[0]) * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y, self.screen, self.color))
             self.coords.append((shape[0] * GRID_SIZE + self.x, (shape[1] - 1) * GRID_SIZE + self.y))
-            
+    
+    def check_collision_inside(self):
+        for mino in self.minoes:
+            if (mino.check_collision_inside(self.coords)):
+                return True
+        return False
+
     def check_collision_bottom(self):
         for mino in self.minoes:
             if (mino.check_collision_bottom(self.coords)):
@@ -482,4 +565,3 @@ class Tetromino:
 
 if __name__ == "__main__":
     Game()
-    
