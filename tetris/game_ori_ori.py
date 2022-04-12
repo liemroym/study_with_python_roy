@@ -130,8 +130,6 @@ class Game:
         self.lock_counter = 0
         self.DAS_counter = 0
 
-        self.finished = False
-
         self.update_ghost()
         self.main()
 
@@ -181,12 +179,11 @@ class Game:
                         self.DAS_counter = 0
                         self.DAS_right_controller = False
 
-            if (not self.finished):
-                self.check_move()
-                self.handle_fall()
-                self.update_UI()
-                self.update_ghost()
-                self.current_tetromino.draw()
+            self.check_move()
+            self.handle_fall()
+            self.update_UI()
+            self.update_ghost()
+            self.current_tetromino.draw()
 
             pygame.display.flip()
             pygame.time.Clock().tick(60)
@@ -270,7 +267,6 @@ class Game:
                 line_full.append(j)
             elif (j == 0 and len(line) != 0):
                 print("DEAD")
-                self.finished = True
         
         for line in line_full:
             for cleared_mino_pair in minoes_in_line[line]:
@@ -483,7 +479,7 @@ class Tetromino:
         pygame.display.flip()
 
     def hard_drop(self):
-        while (not self.check_collision_bottom()):
+        while (not self.bottom):
             self.fall()
         
 
