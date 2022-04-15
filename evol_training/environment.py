@@ -1,3 +1,4 @@
+from math import floor
 from random import randint
 import pygame
 import torch
@@ -9,9 +10,11 @@ pygame.init()
 SCREEN_POS = (0, 0)
 SCREEN_SIZE = (400, 400) 
 SCREEN_COLOR = (0, 0, 0)
-GRID_AMOUNT = (20, 20) # (0->(X-1), 0->(Y-1))
+GRID_AMOUNT = (40, 40) # (0->(X-1), 0->(Y-1))
 NODE_SIZE = (SCREEN_SIZE[0] // GRID_AMOUNT[0], SCREEN_SIZE[1] // GRID_AMOUNT[1]) # (0, SS - NS)
-INTERVAL = 100
+INTERVAL = 50
+RANDOM_VAR = 0
+iterator = 0
 
 class Simulation:
     def __init__(self):
@@ -38,7 +41,6 @@ class Simulation:
 
         self.nodes.append(Node(self.screen, pos, model))
         self.nodes[len(self.nodes)-1].draw()
-        
 
     def update_UI(self):
         self.screen.fill(SCREEN_COLOR)
@@ -52,7 +54,7 @@ class Simulation:
         count = 0
         while i < len(self.nodes):
             node = self.nodes[i]
-            if (node.x < SCREEN_SIZE[0] // 2):
+            if (node.x > SCREEN_SIZE[0] // 2):
                 self.nodes.pop(i)
                 i -= 1
                 count += 1
@@ -60,13 +62,16 @@ class Simulation:
 
         temp = self.nodes.copy()
         self.nodes.clear()
+        self.screen.fill(SCREEN_COLOR)
+        print(len(temp))
         for i in range(len(temp)):
-            if len(self.nodes) < (GRID_AMOUNT[0] * GRID_AMOUNT[1]) - 4:
-                self.create_node(temp[i].model)
-                self.create_node(temp[i].model)
-
-        print(count)
-
+            j = randint(0, len(temp)-1)
+            if len(self.nodes) < (GRID_AMOUNT[0] * GRID_AMOUNT[1] // 4):
+                self.create_node(temp[j].model)
+                self.create_node(temp[j].model)
+                temp.pop(j)
+            else:
+                break
 
     def main(self):
         running = True
@@ -96,18 +101,37 @@ class Node:
         self.y = pos[1]
 
         if (model == None):
-            self.model = LinearNet(4, 4, 5)
+            self.model = LinearNet(4, 5)
         else:
             self.model = model
+        
+
+        if (self.model.linear2 != None):
+            self.color = self.model.linear2.weight
+        else:
+            self.color = self.model.linear1.weight
+
+        weight_list = self.color.tolist() 
+        self.color = (
+            # R = w0
+            floor(sum(weight_list[0]) / 5 * 128) + 128,
+            # G = w1 + w3//2
+            floor(sum(weight_list[1]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128,
+            # B = w2 + w3//2
+            floor(sum(weight_list[2]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128
+        )
 
     def do_move(self):
-        percepts = [int(self.coll_top()), int(self.coll_bottom()), int(self.coll_left()), int(self.coll_right())]
-        input = torch.tensor(percepts, dtype=torch.long)
+        move = -1
+        if (randint(0, iterator) < RANDOM_VAR):
+            move = randint(0, 4)
+        else: 
+            percepts = [int(self.coll_top()), int(self.coll_bottom()), int(self.coll_left()), int(self.coll_right())]
+            input = torch.tensor(percepts, dtype=torch.long)
 
-        res = self.model(input.float())
+            res = self.model(input.float())
+            move = torch.argmax(res)
 
-        move = torch.argmax(res)
-    
         if (move == 0):
             self.move_top()
         elif (move == 1):
@@ -116,9 +140,6 @@ class Node:
             self.move_left()
         elif (move == 3):
             self.move_right()
-            
-
-
 
     # Check collision
     def coll_top(self):
@@ -170,23 +191,30 @@ class Node:
             self.x += NODE_SIZE[0]
     
     def draw(self):
-        pygame.draw.rect(self.surface, (255, 255, 255), pygame.Rect(self.x, self.y, NODE_SIZE[0], NODE_SIZE[1]))
-
+        pygame.draw.rect(self.surface, self.color, pygame.Rect(self.x, self.y, NODE_SIZE[0], NODE_SIZE[1]))
 
 
 class LinearNet(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, output_size, hidden_size=None):
         super().__init__()
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, output_size)
+        if (hidden_size != None):
+            self.linear1 = nn.Linear(input_size, hidden_size)
+            self.linear2 = nn.Linear(hidden_size, output_size)
+        else:
+            self.linear1 = nn.Linear(input_size, output_size)
+            self.linear2 = None
 
     def forward(self, input):
+        torch.no_grad()
         # print("1", x)
         # print(x, x.type())
         # print(input, input.type())
-        x = self.linear1(input)
+        if (self.linear2 != None):
+            x = self.linear1(input)
+            x = F.sigmoid(self.linear2(x))
+        else:
+            x = F.sigmoid(self.linear1(input))
         # print("2", x)
-        x = self.linear2(x)
         # print("3", x)
 
         return x
