@@ -134,6 +134,42 @@ time.sleep(3)
 # 715, y=641
 # Point(x=319, y=102)#
 
+# #############################################
+# #   AUTO ADD DATA INTO DATABASE WORKBENCH   #
+# #############################################
+# data = '''tortillahotel	railshon@zipet.site	~pvLMV93K1*M->BFiqA[tFm3#NOjA|?&-CtCEo9Z_UThp.@I\V[q^&uZYiyh
+# lastoctopus	tgarjioni@yaachea.com	49vD#?X?&~+vN2d9soO3Z\8;@ZiZ5h-WV+BHc+RU=Dd8R9jBDqdd)bu_u}1U
+# juvenilecowardice	kpwalls@guitarsxltd.com	UO\jQy%k:&J""gjWjdh'OkZ?[Z4-@R?cU5M=RpC0ogehd&dXAPOpvEVOBA-[
+# icecreamcapricious	chicoos@osmye.com	Z*Sc&IQ{"3B9ON]jpk`ou:SLqth[J9jnhc<xI,<$G=B>F@;&V>V`&:Z&7(ma
+# tumbletrail	lgspotlg@osmye.com	Clu]5=:r[}m-_)2g0aICe@/BFR=$g5VDx,O=5=i(,gjMzs|*#(0tq{S+LUpM
+# '''
 
-for i in range(10000):
-    print(4, end=" ")
+# data = data.replace('\n', ' ')
+# data = data.replace('\t', ' ')
+# data = data.split(' ')  
+
+# for i, d in enumerate(data):
+#     direct_key.write(d)
+#     direct_key.PressKey(direct_key.keys['\t'])    
+
+# for i in range(10000):
+#     print(4, end=" ")
+
+
+points = [(265, 251),
+    (235, 365),
+    (224, 497),
+    (643, 268),
+    (665, 373),
+    (666, 481),
+    (335, 667),
+    (442, 664),
+    (568, 640)]
+
+for point in points:
+    for p in points:
+        if point != p:
+            pyautogui.click(311, 107)
+            pyautogui.click(point[0], point[1])
+            pyautogui.click(p[0], p[1])
+            
