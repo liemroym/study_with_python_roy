@@ -1,14 +1,10 @@
 from math import floor
 from random import randint
 import pygame
-import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-import tensorflow as tf
-# import tensorflow as tf
-
-# tf.enable_eager_execution(tf.ConfigProto(log_device_placement=True)) 
-# tf.test.is_gpu_available()
-# tf.__version__
 pygame.init()
 
 SCREEN_POS = (0, 0)
@@ -25,7 +21,7 @@ class Simulation:
         self.screen = pygame.display.set_mode(SCREEN_SIZE)
         self.clock = pygame.time.Clock()
 
-        self.node_count = 50
+        self.node_count = 100
         self.nodes : list[Node] = []
 
         self.counter = 0
@@ -70,7 +66,7 @@ class Simulation:
         print(len(temp))
         for i in range(len(temp)):
             j = randint(0, len(temp)-1)
-            if len(self.nodes) < (GRID_AMOUNT[0] * GRID_AMOUNT[1] // 4):
+            if len(self.nodes) < (GRID_AMOUNT[0] * GRID_AMOUNT[1] // 2):
                 self.create_node(temp[j].model)
                 self.create_node(temp[j].model)
                 temp.pop(j)
@@ -105,56 +101,44 @@ class Node:
         self.y = pos[1]
 
         if (model == None):
-            self.model = LinearNet(4, 4)
+            self.model = LinearNet(4, 5)
         else:
             self.model = model
         
-        self.model.build(input_shape=(1, 4))
 
-        # if (self.model.linear2 != None):
-        #     self.color = self.model.linear2.weight
-        # else:
-        #     self.color = self.model.linear1.weight
+        if (self.model.linear2 != None):
+            self.color = self.model.linear2.weight
+        else:
+            self.color = self.model.linear1.weight
 
-        # weight_list = self.color.tolist() 
-        # self.color = (
-        #     # R = w0
-        #     floor(sum(weight_list[0]) / 5 * 128) + 128,
-        #     # G = w1 + w3//2
-        #     floor(sum(weight_list[1]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128,
-        #     # B = w2 + w3//2
-        #     floor(sum(weight_list[2]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128
-        # )
+        weight_list = self.color.tolist() 
+        self.color = (
+            # R = w0
+            floor(sum(weight_list[0]) / 5 * 128) + 128,
+            # G = w1 + w3//2
+            floor(sum(weight_list[1]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128,
+            # B = w2 + w3//2
+            floor(sum(weight_list[2]) / 5 * 64) + (sum(weight_list[3]) / 5 * 64) + 128
+        )
 
     def do_move(self):
-        move = [0, 0, 0, 0]
+        move = -1
         if (randint(0, iterator) < RANDOM_VAR):
-            move[randint(0, 4)] = 1
+            move = randint(0, 4)
         else: 
-            # percepts = [int(self.coll_top()), int(self.coll_bottom()), int(self.coll_left()), int(self.coll_right())]
-            percepts = [[int(self.coll_top()), int(self.coll_bottom()), int(self.coll_left()), int(self.coll_right())]]
-            input = tf.Variable(percepts)
+            percepts = [int(self.coll_top()), int(self.coll_bottom()), int(self.coll_left()), int(self.coll_right())]
+            input = torch.tensor(percepts, dtype=torch.long)
 
-            res = self.model(input)
-            res.numpy()
-            
-            res = res[0]
-            max = 0
-            maxIdx = 0
-            for i, act in enumerate(res):
-                if act >= max:
-                    max = act
-                    maxIdx = i
+            res = self.model(input.float())
+            move = torch.argmax(res)
 
-            move[maxIdx] = 1
-
-        if (move[0]):
+        if (move == 0):
             self.move_top()
-        elif (move[1]):
+        elif (move == 1):
             self.move_bottom()
-        elif (move[2]):
+        elif (move == 2):
             self.move_left()
-        elif (move[3]):
+        elif (move == 3):
             self.move_right()
 
     # Check collision
@@ -207,45 +191,36 @@ class Node:
             self.x += NODE_SIZE[0]
     
     def draw(self):
-        # pygame.draw.rect(self.surface, self.color, pygame.Rect(self.x, self.y, NODE_SIZE[0], NODE_SIZE[1]))
-        pygame.draw.rect(self.surface, (255,255,255), pygame.Rect(self.x, self.y, NODE_SIZE[0], NODE_SIZE[1]))
+        pygame.draw.rect(self.surface, self.color, pygame.Rect(self.x, self.y, NODE_SIZE[0], NODE_SIZE[1]))
 
 
-class LinearNet(tf.keras.Model):
+class LinearNet(nn.Module):
     def __init__(self, input_size, output_size, hidden_size=None):
-        if (hidden_size == None):
-            super(LinearNet, self).__init__()
-            self.layer1 = tf.keras.layers.Dense(output_size, input_shape=(input_size,))
-            self.activation = tf.keras.layers.Activation('sigmoid')
-            
+        super().__init__()
+        if (hidden_size != None):
+            self.linear1 = nn.Linear(input_size, hidden_size)
+            self.linear2 = nn.Linear(hidden_size, output_size)
         else:
-            # self.linear1 = nn.Linear(input_size, output_size)
-            # self.linear2 = None
-            pass
+            self.linear1 = nn.Linear(input_size, output_size)
+            self.linear2 = None
 
-    def call(self, input):
-        # print(input)
-        input = self.layer1(input)
-        input = self.activation(input)
-        return input        
+    def forward(self, input):
+        torch.no_grad()
+        # print("1", x)
+        # print(x, x.type())
+        # print(input, input.type())
+        if (self.linear2 != None):
+            x = self.linear1(input)
+            x = F.sigmoid(self.linear2(x))
+        else:
+            x = F.sigmoid(self.linear1(input))
+        # print("2", x)
+        # print("3", x)
+
+        return x
 
 if __name__ == "__main__":
     Simulation()
-    # (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
-    # x_train = x_train / 255.0
-    # x_test = x_test / 255.0
 
-    # model = tf.keras.models.Sequential([
-    # tf.keras.layers.Flatten(input_shape=(28, 28, 1)),
-    # tf.keras.layers.Dense(4096,activation='relu'),
-    # tf.keras.layers.Dense(4096,activation='relu'),
-    # tf.keras.layers.Dense(10, activation='softmax')
-    # ])
-    # model.summary()
 
-    # model.compile(optimizer='adam',
-    #             loss='sparse_categorical_crossentropy',
-    #             metrics=['accuracy'],)
-
-    # model.fit(np.expand_dims(x_train,3), y_train, epochs=2, batch_size=1024)
 
