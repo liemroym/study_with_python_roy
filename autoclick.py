@@ -156,20 +156,24 @@ time.sleep(3)
 #     print(4, end=" ")
 
 
-points = [(265, 251),
-    (235, 365),
-    (224, 497),
-    (643, 268),
-    (665, 373),
-    (666, 481),
-    (335, 667),
-    (442, 664),
-    (568, 640)]
+# points = [(265, 251),
+#     (235, 365),
+#     (224, 497),
+#     (643, 268),
+#     (665, 373),
+#     (666, 481),
+#     (335, 667),
+#     (442, 664),
+#     (568, 640)]
 
-for point in points:
-    for p in points:
-        if point != p:
-            pyautogui.click(311, 107)
-            pyautogui.click(point[0], point[1])
-            pyautogui.click(p[0], p[1])
+# for point in points:
+#     for p in points:
+#         if point != p:
+#             pyautogui.click(311, 107)
+#             pyautogui.click(point[0], point[1])
+#             pyautogui.click(p[0], p[1])
             
+# for i in range(10):
+#     pyautogui.hotkey('shift', )
+
+

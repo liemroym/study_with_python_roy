@@ -1,0 +1,65 @@
+DEFINE FUNCTION divided_diff(x, y): 
+
+    # Mencari f[x0..xn] dengan data x dan y
+
+    '''
+
+    fungsi untuk menghitung tabel beda hingga
+
+    '''
+
+    SET n TO len(y)
+
+    # Inisialisasi coef dengan matriks n * n berisi nilai 0
+
+    SET coef TO np.zeros([n, n]) 
+
+    # Kolom pertama adalah y
+
+    SET coef[:,0] TO y
+
+    
+
+    FOR j IN range(1,n):
+
+        FOR i IN range(n-j):
+
+            # \ untuk melanjutkan line di newline
+
+            SET coef[i][j] TO \
+
+            (coef[i+1][j-1] - coef[i][j-1]) / (x[i+j]-x[i])
+
+ 
+
+    RETURN coef
+
+
+
+DEFINE FUNCTION newton_poly(coef, x_data, x):
+
+    # Mencari nilai x dengan x_data dan coef hasil divided_dif
+
+    # Bentuk rekursif diubah menjadi bentuk iterasi i..n+1
+
+    """
+
+    Mengevaluasi Polinomial newton pada x
+
+    """
+
+    # Inisialisasi 
+
+    SET n TO len(x_data) - 1 
+
+    SET p TO coef[n]
+
+    FOR k IN range(1,n+1):
+
+        SET # iterasi ke belakang (p dimulai dari n-k, k[1..n] TO (n-1)-0)
+
+        SET # pn TO pn-1(x)+ f[xn..x0]
+
+        SET p TO (x -x_data[n-k])*p + coef[n-k] 
+
+    RETURN p
