@@ -156,7 +156,9 @@ def train():
             plotMeanScores.append(totalScore / agent.ngames)
 
             plot(plotScores, plotMeanScores)
-
+            agent.model.save()
+        
 
 if __name__ == '__main__':
     train()
+    
